@@ -3,38 +3,51 @@
 import { InfoBlockApiService } from '../api/InfoBlockApiService.js';
 import { getEnabledBlocks } from './StateManager.js';
 import { renderBlockLoading, clearBlockLoading, clearMessageBlocks, getLastBotMesId } from '../ui/BlockRenderer.js';
-import { chat, saveChatDebounced, updateMessageBlock } from '../../../../../script.js';
+// ВАЖНО: Добавили eventSource и event_types в импорты
+import { chat, saveChatDebounced, updateMessageBlock, eventSource, event_types } from '../../../../../script.js';
 
 // 1. ГЛОБАЛЬНЫЙ МАРКЕР (Защита от дублей)
 const SIB_MARKER = '<' + '!-- sib-processed --' + '>';
 
+// ФЛАГ: Генерирует ли Таверна ответ прямо сейчас?
+let isStGenerating = false;
+
+// Подключаемся к "мозгам" Таверны
+if (eventSource && event_types) {
+    eventSource.on(event_types.GENERATION_STARTED, () => { 
+        isStGenerating = true; 
+    });
+    eventSource.on(event_types.GENERATION_STOPPED, () => { 
+        isStGenerating = false; 
+    });
+    eventSource.on(event_types.MESSAGE_RECEIVED, () => { 
+        isStGenerating = false; 
+    });
+}
+
 export async function runAllBlocks(mesId, options = {}) {
     if (mesId === 0 || mesId === '0') return;
+
+    // ЖЕЛЕЗОБЕТОННАЯ ЗАЩИТА: Если Таверна сейчас пишет ответ (реролл) — спим!
+    if (isStGenerating) {
+        console.log(`[ST-InfoBlocks] Отмена: Таверна в процессе генерации. Ждем MESSAGE_RECEIVED.`);
+        return;
+    }
 
     const { isSwipe = false } = options;
     const messageText = chat[mesId]?.mes || '';
     const cleanText = messageText.trim();
 
-    // ===== ДЕБАГ БЛОК (Смотрим, что нам врет Таверна) =====
-    console.log("%c[ST-InfoBlocks DEBUG]", "color: #00ffcc; font-size: 14px; font-weight: bold;");
-    console.log(`Срабатывание на сообщении: ${mesId}. Это свайп? ${isSwipe}`);
-    console.log("Текст, который видит скрипт прямо сейчас: >>>\n", cleanText, "\n<<<");
-    console.log("Есть ли там маркер?", messageText.includes(SIB_MARKER));
-    // =======================================================
-
-    // ЗАЩИТА 1: Пустота или точки
+    // Защита от пустых сообщений
     if (!cleanText || cleanText === '...' || cleanText === '…') {
-        console.log(`[ST-InfoBlocks] Отмена: сообщение пустое или это точки.`);
         return;
     }
 
-    // ЗАЩИТА 2: Наш маркер
+    // УНИВЕРСАЛЬНАЯ ЗАЩИТА: Ищем наш скрытый маркер
     if (messageText.includes(SIB_MARKER)) {
-        console.log(`[ST-InfoBlocks] Отмена: маркер уже стоит.`);
+        console.log(`[ST-InfoBlocks] Блоки уже есть в сообщении ${mesId}, пропускаем генерацию.`);
         return;
     }
-
-    console.log("%c[ST-InfoBlocks] ВНИМАНИЕ! ЗАЩИТА ПРОБИТА! ИДЕТ ЗАПРОС...", "color: #ff3333; font-weight: bold;");
 
     const blocks = getEnabledBlocks().filter(b => {
         if (isSwipe && !b.triggerOnSwipe) return false;
