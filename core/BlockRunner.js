@@ -5,6 +5,9 @@ import { getEnabledBlocks } from './StateManager.js';
 import { renderBlockLoading, clearBlockLoading, clearMessageBlocks, getLastBotMesId } from '../ui/BlockRenderer.js';
 import { chat, saveChatDebounced, updateMessageBlock } from '../../../../../script.js';
 
+// 1. ГЛОБАЛЬНЫЙ МАРКЕР (Защита от дублей)
+const SIB_MARKER = '<' + '!-- sib-processed --' + '>';
+
 export async function runAllBlocks(mesId, options = {}) {
     if (mesId === 0 || mesId === '0') return;
 
@@ -32,14 +35,6 @@ export async function runAllBlocks(mesId, options = {}) {
     }
 
     console.log("%c[ST-InfoBlocks] ВНИМАНИЕ! ЗАЩИТА ПРОБИТА! ИДЕТ ЗАПРОС...", "color: #ff3333; font-weight: bold;");
-
-    const blocks = getEnabledBlocks().filter(b => {
-
-    // 3. УНИВЕРСАЛЬНАЯ ЗАЩИТА: Ищем наш скрытый маркер
-    if (messageText.includes(SIB_MARKER)) {
-        console.log(`[ST-InfoBlocks] Блоки уже есть в сообщении ${mesId}, пропускаем генерацию.`);
-        return;
-    }
 
     const blocks = getEnabledBlocks().filter(b => {
         if (isSwipe && !b.triggerOnSwipe) return false;
@@ -117,7 +112,6 @@ export function onMessageSwiped(mesId) {
     const targetId = mesId ?? getLastBotMesId();
     if (targetId === null || targetId === undefined) return;
 
-    // Убрали костыль с таймером, так как теперь нас надежно защищает проверка на "..."
     setTimeout(() => {
         clearMessageBlocks(targetId);
         runAllBlocks(targetId, { isSwipe: true });
