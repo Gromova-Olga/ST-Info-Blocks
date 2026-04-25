@@ -5,17 +5,16 @@ import { getEnabledBlocks } from './StateManager.js';
 import { renderBlockLoading, clearBlockLoading, clearMessageBlocks, getLastBotMesId } from '../ui/BlockRenderer.js';
 import { chat, saveChatDebounced, updateMessageBlock } from '../../../../../script.js';
 
+// 1. ГЛОБАЛЬНЫЙ МАРКЕР (Вынесен наверх, чтобы его видели все функции)
+const SIB_MARKER = '<' + '!-- sib-processed --' + '>';
+
 export async function runAllBlocks(mesId, options = {}) {
-    // 1. ИГНОРИРУЕМ ПЕРВОЕ СООБЩЕНИЕ (Приветствие)
     if (mesId === 0 || mesId === '0') return;
 
     const { isSwipe = false } = options;
     const messageText = chat[mesId]?.mes || '';
 
-    // СОЗДАЕМ МАРКЕР ТАК, ЧТОБЫ ЕГО НИКТО НЕ СЪЕЛ
-    const SIB_MARKER = '<' + '!-- sib-processed --' + '>';
-
-    // 2. ЗАЩИТА ПРИ РЕРОЛЛЕ:
+    // 2. ЗАЩИТА: Не дергаем API на пустых сообщениях
     if (!messageText.trim()) {
         console.log(`[ST-InfoBlocks] Сообщение ${mesId} пока пустое, пропускаем.`);
         return;
@@ -82,16 +81,11 @@ async function runGroup(group, mesId) {
             chat[mesId].mes += '\n\n' + SIB_MARKER + '\n' + cleanHtml;
             
             saveChatDebounced();
-            
-            // ОБЯЗАТЕЛЬНО ПЕРЕДАЕМ ВТОРОЙ АРГУМЕНТ, чтобы не было ошибки "message is undefined"
             await updateMessageBlock(mesId, chat[mesId]); 
         }
 
     } catch (err) {
-        // Убираем лоадеры при ошибке
         group.forEach(b => clearBlockLoading(mesId, b.id));
-        
-        // Выводим ошибку только всплывашкой сверху справа, в чат ничего не пишем
         const groupNames = group.map(b => b.name).join(', ');
         toastr.warning(`Ошибка ST-InfoBlocks (${groupNames}): ${err.message}`, '', { timeOut: 5000 });
         console.error(`[ST-InfoBlocks] Ошибка генерации:`, err);
@@ -102,7 +96,6 @@ export function onMessageReceived(mesId) {
     const targetId = mesId ?? getLastBotMesId();
     if (targetId === null || targetId === undefined) return;
     
-    // Небольшая задержка, чтобы ST успела отрисовать сообщение
     setTimeout(() => runAllBlocks(targetId, { isSwipe: false }), 400);
 }
 
@@ -110,8 +103,23 @@ export function onMessageSwiped(mesId) {
     const targetId = mesId ?? getLastBotMesId();
     if (targetId === null || targetId === undefined) return;
 
+    // ХАКЕРСКАЯ ЗАЩИТА ОТ РЕРОЛЛА (Детектор стриминга)
+    // Запоминаем текст сообщения в момент свайпа
+    const textBefore = chat[targetId]?.mes || '';
+
     setTimeout(() => {
+        // Проверяем текст через 800мс
+        const textAfter = chat[targetId]?.mes || '';
+        
+        // Если текст изменился, значит нейросеть прямо сейчас печатает ответ!
+        // Сбрасываем генерацию и ждем события MESSAGE_RECEIVED
+        if (textBefore !== textAfter) {
+            console.log('[ST-InfoBlocks] Обнаружен стриминг при реролле, ждем окончания генерации.');
+            return;
+        }
+
+        // Если текст не менялся — это обычный свайп на старое сообщение
         clearMessageBlocks(targetId);
         runAllBlocks(targetId, { isSwipe: true });
-    }, 500);
+    }, 800);
 }
