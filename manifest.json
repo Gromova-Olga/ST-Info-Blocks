@@ -1,13 +1,11 @@
 {
-    "display_name": "ST-Info-Blocks",
-    "name": "st-info-blocks",
+    "display_name": "ST Info Blocks",
     "version": "1.0.0",
     "author": "Gromova-Olga",
-    "description": "Внешние инфоблоки: отдельные AI-запросы с HTML-выводом под сообщениями",
     "js": "index.js",
     "css": "style.css",
     "homePage": "https://github.com/Gromova-Olga/ST-Info-Blocks",
     "requires": [],
     "optional": [],
-    "tags": ["utility"]
+    "auto_update": false
 }
