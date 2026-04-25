@@ -31,8 +31,19 @@ $(document).ready(async function () {
         `;
         $('#top-settings-holder').append(topButtonHtml);
 
+        // Добавляем кнопку в меню волшебной палочки (extensionsMenu)
+        const wandButtonHtml = `
+            <div id="sib-wand-container" class="extension_container interactable" tabindex="0">
+                <div id="sib-wand-button" class="list-group-item flex-container flexGap5 interactable" tabindex="0" role="listitem">
+                    <i class="fas fa-layer-group"></i>
+                    <span>ST Info Blocks</span>
+                </div>
+            </div>
+        `;
+        $('#extensionsMenu').append(wandButtonHtml);
+
         // Обработчики кликов (и в меню расширений, и в топ-баре)
-        $(document).on('click', '#sib-open-modal-btn, #sib-top-button', openSettingsModal);
+        $(document).on('click', '#sib-open-modal-btn, #sib-top-button, #sib-wand-button', openSettingsModal);
 
         eventSource.on(event_types.MESSAGE_RECEIVED, (mesId) => {
             const mesEl = $(`.mes[mesid="${mesId}"]`);
