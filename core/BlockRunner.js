@@ -5,9 +5,6 @@ import { getEnabledBlocks } from './StateManager.js';
 import { renderBlockLoading, clearBlockLoading, clearMessageBlocks, getLastBotMesId } from '../ui/BlockRenderer.js';
 import { chat, saveChatDebounced, updateMessageBlock } from '../../../../../script.js';
 
-// 1. ГЛОБАЛЬНЫЙ МАРКЕР (Защита от дублей)
-const SIB_MARKER = '<' + '!-- sib-processed --' + '>';
-
 export async function runAllBlocks(mesId, options = {}) {
     if (mesId === 0 || mesId === '0') return;
 
@@ -15,13 +12,28 @@ export async function runAllBlocks(mesId, options = {}) {
     const messageText = chat[mesId]?.mes || '';
     const cleanText = messageText.trim();
 
-    // 2. ИДЕАЛЬНАЯ ЗАЩИТА ОТ РЕРОЛЛА
-    // Таверна ставит "..." или "…" пока ждет ответ от API. Это не пустая строка!
-    // Отсекаем эти системные плейсхолдеры.
+    // ===== ДЕБАГ БЛОК (Смотрим, что нам врет Таверна) =====
+    console.log("%c[ST-InfoBlocks DEBUG]", "color: #00ffcc; font-size: 14px; font-weight: bold;");
+    console.log(`Срабатывание на сообщении: ${mesId}. Это свайп? ${isSwipe}`);
+    console.log("Текст, который видит скрипт прямо сейчас: >>>\n", cleanText, "\n<<<");
+    console.log("Есть ли там маркер?", messageText.includes(SIB_MARKER));
+    // =======================================================
+
+    // ЗАЩИТА 1: Пустота или точки
     if (!cleanText || cleanText === '...' || cleanText === '…') {
-        console.log(`[ST-InfoBlocks] Сообщение ${mesId} пустое (реролл/ожидание), пропускаем.`);
+        console.log(`[ST-InfoBlocks] Отмена: сообщение пустое или это точки.`);
         return;
     }
+
+    // ЗАЩИТА 2: Наш маркер
+    if (messageText.includes(SIB_MARKER)) {
+        console.log(`[ST-InfoBlocks] Отмена: маркер уже стоит.`);
+        return;
+    }
+
+    console.log("%c[ST-InfoBlocks] ВНИМАНИЕ! ЗАЩИТА ПРОБИТА! ИДЕТ ЗАПРОС...", "color: #ff3333; font-weight: bold;");
+
+    const blocks = getEnabledBlocks().filter(b => {
 
     // 3. УНИВЕРСАЛЬНАЯ ЗАЩИТА: Ищем наш скрытый маркер
     if (messageText.includes(SIB_MARKER)) {
