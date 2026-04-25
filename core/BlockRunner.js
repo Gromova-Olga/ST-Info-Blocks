@@ -10,10 +10,17 @@ export async function runAllBlocks(mesId, options = {}) {
     if (mesId === 0 || mesId === '0') return;
 
     const { isSwipe = false } = options;
-
     const messageText = chat[mesId]?.mes || '';
-    if (messageText.includes('class="sib-block')) {
-        console.log(`[ST-InfoBlocks] Блоки уже есть в сообщении ${mesId}, пропускаем.`);
+
+    // 2. ЗАЩИТА ПРИ РЕРОЛЛЕ: Не дергаем API на пустых сообщениях (ждем пока допечатается текст)
+    if (!messageText.trim()) {
+        console.log(`[ST-InfoBlocks] Сообщение ${mesId} пока пустое, пропускаем.`);
+        return;
+    }
+
+    // 3. УНИВЕРСАЛЬНАЯ ЗАЩИТА: Ищем наш скрытый маркер
+    if (messageText.includes('')) {
+        console.log(`[ST-InfoBlocks] Блоки уже есть в сообщении ${mesId}, пропускаем генерацию.`);
         return;
     }
 
@@ -24,6 +31,7 @@ export async function runAllBlocks(mesId, options = {}) {
 
     if (!blocks.length) return;
 
+    // Группировка блоков
     const taskGroups = [];
     const manualGroups = {};
 
@@ -37,8 +45,10 @@ export async function runAllBlocks(mesId, options = {}) {
     }
     Object.values(manualGroups).forEach(group => taskGroups.push(group));
 
+    // Показываем лоадеры
     blocks.forEach(b => renderBlockLoading(mesId, b.id, b.name));
 
+    // Запускаем группы параллельно
     await Promise.allSettled(
         taskGroups.map(group => runGroup(group, mesId))
     );
@@ -47,6 +57,7 @@ export async function runAllBlocks(mesId, options = {}) {
 async function runGroup(group, mesId) {
     if (group.length === 0) return;
 
+    // Склеиваем промпты для группы
     const combinedPrompt = group.length === 1 
         ? group[0].prompt 
         : `Сгенерируй следующие инфоблоки. Верни ТОЛЬКО чистый HTML код для всех блоков подряд, без пояснений.\n\n` +
@@ -60,23 +71,27 @@ async function runGroup(group, mesId) {
         // Удаляем временные лоадеры
         group.forEach(b => clearBlockLoading(mesId, b.id));
 
+        // Чистим ответ от возможных markdown-оберток
         const cleanHtml = html.replace(/^```html\s*/im, '').replace(/```\s*$/m, '').trim();
 
         if (chat[mesId]) {
-            // Записываем HTML в память чата
-            chat[mesId].mes += '\n\n' + cleanHtml;
+            // ВСТАВЛЯЕМ НЕВИДИМЫЙ МАРКЕР + СГЕНЕРИРОВАННЫЙ КОД
+            chat[mesId].mes += '\n\n\n' + cleanHtml;
+            
             saveChatDebounced();
             
-            // ИСПРАВЛЕННАЯ СТРОКА: передаем chat[mesId]
-            // Добавил await на всякий случай, в новых версиях ST это промис
+            // ОБЯЗАТЕЛЬНО ПЕРЕДАЕМ ВТОРОЙ АРГУМЕНТ, чтобы не было ошибки "message is undefined"
             await updateMessageBlock(mesId, chat[mesId]); 
         }
 
     } catch (err) {
+        // Убираем лоадеры при ошибке
         group.forEach(b => clearBlockLoading(mesId, b.id));
+        
         // Выводим ошибку только всплывашкой сверху справа, в чат ничего не пишем
-        toastr.warning(`Ошибка ST-InfoBlocks: ${err.message}`, '', { timeOut: 5000 });
-        console.error(`[ST-InfoBlocks] Ошибка:`, err);
+        const groupNames = group.map(b => b.name).join(', ');
+        toastr.warning(`Ошибка ST-InfoBlocks (${groupNames}): ${err.message}`, '', { timeOut: 5000 });
+        console.error(`[ST-InfoBlocks] Ошибка генерации:`, err);
     }
 }
 
@@ -84,6 +99,7 @@ export function onMessageReceived(mesId) {
     const targetId = mesId ?? getLastBotMesId();
     if (targetId === null || targetId === undefined) return;
     
+    // Небольшая задержка, чтобы ST успела отрисовать сообщение
     setTimeout(() => runAllBlocks(targetId, { isSwipe: false }), 400);
 }
 
