@@ -1,6 +1,6 @@
 // constants/DefaultSettings.js
 
-export const extensionName = 'st-info-blocks';
+export const extensionName = 'ST-Info-Blocks';
 
 export const defaultSettings = {
     enabled: true,
