@@ -12,14 +12,17 @@ export async function runAllBlocks(mesId, options = {}) {
     const { isSwipe = false } = options;
     const messageText = chat[mesId]?.mes || '';
 
-    // 2. ЗАЩИТА ПРИ РЕРОЛЛЕ: Не дергаем API на пустых сообщениях (ждем пока допечатается текст)
+    // СОЗДАЕМ МАРКЕР ТАК, ЧТОБЫ ЕГО НИКТО НЕ СЪЕЛ
+    const SIB_MARKER = '<' + '!-- sib-processed --' + '>';
+
+    // 2. ЗАЩИТА ПРИ РЕРОЛЛЕ:
     if (!messageText.trim()) {
         console.log(`[ST-InfoBlocks] Сообщение ${mesId} пока пустое, пропускаем.`);
         return;
     }
 
     // 3. УНИВЕРСАЛЬНАЯ ЗАЩИТА: Ищем наш скрытый маркер
-    if (messageText.includes('')) {
+    if (messageText.includes(SIB_MARKER)) {
         console.log(`[ST-InfoBlocks] Блоки уже есть в сообщении ${mesId}, пропускаем генерацию.`);
         return;
     }
@@ -76,7 +79,7 @@ async function runGroup(group, mesId) {
 
         if (chat[mesId]) {
             // ВСТАВЛЯЕМ НЕВИДИМЫЙ МАРКЕР + СГЕНЕРИРОВАННЫЙ КОД
-            chat[mesId].mes += '\n\n\n' + cleanHtml;
+            chat[mesId].mes += '\n\n' + SIB_MARKER + '\n' + cleanHtml;
             
             saveChatDebounced();
             
