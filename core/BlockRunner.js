@@ -103,6 +103,14 @@ async function runGroup(group, mesId) {
             
             saveChatDebounced();
             await updateMessageBlock(mesId, chat[mesId]); 
+            
+            // ПИНАЕМ SILLYIMAGES (и другие расширения), чтобы они увидели вклеенный код
+            setTimeout(() => {
+                if (eventSource && event_types && event_types.CHARACTER_MESSAGE_RENDERED) {
+                    console.log('[ST-InfoBlocks] Сигналим SillyImages о появлении новых тегов...');
+                    eventSource.emit(event_types.CHARACTER_MESSAGE_RENDERED, mesId);
+                }
+            }, 100);
         }
 
     } catch (err) {
