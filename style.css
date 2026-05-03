@@ -1,9 +1,36 @@
 /* =====================================================
-   ST Info Blocks — style.css
+   ST Info Blocks — style.css (ISOLATED THEME)
    ===================================================== */
 
-/* ── Контейнер блоков под сообщением ─────────────────── */
+/* ── 1. НЕЗАВИСИМЫЕ ПЕРЕМЕННЫЕ ТЕМЫ ───────────────────── */
+:root,
+.sib-container,
+#sib-modal-overlay {
+    --sib-bg-main: #1e1e2e;        /* Основной фон (модалки) */
+    --sib-bg-panel: #2a2b3c;       /* Фон панелей (блоки в чате) */
+    --sib-bg-input: #11111b;       /* Фон полей ввода */
+    --sib-border: #45475a;         /* Стандартный бордер */
+    --sib-border-light: #585b70;   /* Светлый бордер */
+    --sib-text-main: #cdd6f4;      /* Основной текст */
+    --sib-text-muted: #a6adc8;     /* Вторичный/тусклый текст */
+    --sib-accent: #89b4fa;         /* Акцентный цвет (кнопки, активные табы) */
+    --sib-accent-hover: #b4befe;   /* Ховер акцента */
+    --sib-success: #a6e3a1;        /* Успех / Включенный тогл */
+    --sib-danger: #f38ba8;         /* Ошибка / Кнопки удаления */
+    --sib-font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
 
+/* ── 2. ЖЕСТКИЙ СБРОС (Изоляция от ST) ────────────────── */
+.sib-container *,
+#sib-modal-overlay * {
+    box-sizing: border-box !important;
+    font-family: var(--sib-font) !important;
+    color: var(--sib-text-main);
+    text-shadow: none !important;
+    line-height: 1.5;
+}
+
+/* ── Контейнеры блоков под сообщением ────────────────── */
 .sib-container {
     display: flex;
     flex-direction: column;
@@ -12,23 +39,30 @@
     padding: 0 4px;
 }
 
-/* ── Обёртка одного блока ────────────────────────────── */
-
-.sib-wrapper {
-    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor, #444) 60%, transparent);
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #111) 80%, transparent);
-    overflow: hidden;
-    transition: opacity 0.3s ease;
+.sib-info-container + .sib-image-container {
+    margin-top: 4px;
 }
 
-.sib-wrapper.sib-loading {
+/* ── Обёртка одного блока ────────────────────────────── */
+.sib-wrapper,
+.sib-image-block-wrapper {
+    border: 1px solid var(--sib-border) !important;
+    border-radius: 8px !important;
+    background: var(--sib-bg-panel) !important;
+    overflow: hidden;
+    transition: opacity 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+.sib-wrapper.sib-loading,
+.sib-image-block-wrapper.sib-loading {
     opacity: 0.6;
 }
 
-.sib-wrapper.sib-error {
-    border-color: #c0392b55;
-    background: #c0392b11;
+.sib-wrapper.sib-error,
+.sib-image-block-wrapper.sib-error {
+    border-color: var(--sib-danger) !important;
+    background: rgba(243, 139, 168, 0.1) !important; /* danger с прозрачностью */
 }
 
 /* Заголовок блока */
@@ -36,33 +70,25 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 5px 10px;
+    padding: 6px 10px;
     cursor: pointer;
     user-select: none;
-    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #111) 50%, transparent);
-    border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor, #444) 40%, transparent);
-    font-size: 0.78em;
-    opacity: 0.75;
+    background: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--sib-border);
+    font-size: 0.85em;
+    opacity: 0.85;
     transition: opacity 0.15s;
 }
 
-.sib-header:hover {
-    opacity: 1;
+.sib-header:hover { opacity: 1; }
+.sib-header-name { font-weight: 600; letter-spacing: 0.03em; }
+.sib-spinner {
+    display: inline-block; width: 10px; height: 10px;
+    border: 2px solid transparent; border-top-color: var(--sib-text-muted);
+    border-radius: 50%; animation: sib-spin 0.7s linear infinite;
+    margin-left: 6px; vertical-align: middle;
 }
-
-.sib-header-name {
-    font-weight: 600;
-    letter-spacing: 0.03em;
-}
-
-.sib-toggle-icon {
-    font-size: 0.7em;
-    opacity: 0.6;
-}
-
-.sib-error-icon {
-    color: #e74c3c;
-}
+@keyframes sib-spin { to { transform: rotate(360deg); } }
 
 /* Контент блока */
 .sib-content {
@@ -71,42 +97,13 @@
     transition: max-height 0.3s ease;
     max-height: 2000px;
 }
+.sib-content.sib-collapsed { max-height: 0; padding: 0 10px; }
 
-.sib-content.sib-collapsed {
-    max-height: 0;
-    padding: 0 10px;
-}
-
-.sib-error-text {
-    font-size: 0.8em;
-    color: #e74c3c;
-    padding: 6px 10px;
-}
-
-/* ── Спиннер ──────────────────────────────────────────── */
-
-.sib-spinner {
-    display: inline-block;
-    width: 10px;
-    height: 10px;
-    border: 2px solid transparent;
-    border-top-color: var(--SmartThemeQuoteColor, #aaa);
-    border-radius: 50%;
-    animation: sib-spin 0.7s linear infinite;
-    margin-left: 6px;
-    vertical-align: middle;
-}
-
-@keyframes sib-spin {
-    to { transform: rotate(360deg); }
-}
-
-/* ── Дефолтные стили внутри блоков (пользователь может override) ── */
-
+/* ── Дефолтные стили внутри блоков ───────────────────── */
 .sib-block {
-    font-size: 0.88em;
-    line-height: 1.55;
-    color: var(--SmartThemeBodyColor, #ccc);
+    font-size: 0.9em;
+    color: var(--sib-text-main);
+    padding: 4px;
 }
 
 .sib-block-title {
@@ -114,487 +111,244 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    opacity: 0.55;
+    color: var(--sib-text-muted);
     margin-bottom: 6px;
 }
 
 .sib-row {
     display: flex;
     gap: 8px;
-    padding: 2px 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor, #444) 25%, transparent);
+    padding: 4px 0;
+    border-bottom: 1px solid var(--sib-border);
 }
-
-.sib-row:last-child {
-    border-bottom: none;
-}
+.sib-row:last-child { border-bottom: none; }
 
 .sib-label {
-    opacity: 0.6;
+    color: var(--sib-text-muted);
     min-width: 100px;
     flex-shrink: 0;
 }
+.sib-value { font-weight: 500; }
 
-.sib-value {
-    font-weight: 500;
-}
-
-/* ── Панель настроек ST ───────────────────────────────── */
-
-#sib-settings-root {
-    padding: 6px 0;
-}
-
-.sib-settings-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 6px;
-    flex-wrap: wrap;
-}
-
-.sib-settings-label {
-    font-weight: 600;
-    font-size: 1em;
-}
-
-.sib-settings-hint {
-    font-size: 0.8em;
-    opacity: 0.6;
-    line-height: 1.5;
+/* ── Промт-блок (image) ───────────────────────────────── */
+.sib-image-prompt-text {
+    font-family: 'Courier New', Courier, monospace !important;
+    font-size: 0.85em;
+    color: var(--sib-success);
+    background: var(--sib-bg-input);
+    padding: 8px 10px;
+    border-radius: 6px;
+    border-left: 2px solid var(--sib-success);
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 /* ── Модальное окно ───────────────────────────────────── */
-
 #sib-modal-overlay {
     position: fixed;
     inset: 0;
     z-index: 10000;
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(0, 0, 0, 0.7) !important;
     display: flex;
     align-items: center;
     justify-content: center;
-    backdrop-filter: blur(3px);
+    backdrop-filter: blur(4px);
 }
 
 #sib-modal {
-    background: var(--SmartThemeBlurTintColor, #1a1a2e);
-    border: 1px solid var(--SmartThemeBorderColor, #444);
-    border-radius: 12px;
-    width: min(600px, 94vw);
-    max-height: 85vh;
+    background: var(--sib-bg-main) !important;
+    border: 1px solid var(--sib-border) !important;
+    border-radius: 12px !important;
+    width: min(660px, 94vw);
+    max-height: 88vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7) !important;
 }
 
-/* Шапка модалки */
+/* Шапка */
 #sib-modal-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 14px 18px;
-    border-bottom: 1px solid var(--SmartThemeBorderColor, #444);
+    border-bottom: 1px solid var(--sib-border);
+    background: var(--sib-bg-panel);
     flex-shrink: 0;
 }
-
-#sib-modal-title {
-    font-weight: 700;
-    font-size: 1.05em;
-}
-
+#sib-modal-title { font-weight: 700; font-size: 1.1em; color: var(--sib-text-main); }
 #sib-modal-close {
-    background: none;
-    border: none;
-    color: inherit;
-    font-size: 1.1em;
-    cursor: pointer;
-    opacity: 0.6;
-    padding: 2px 6px;
-    border-radius: 4px;
-    transition: opacity 0.15s, background 0.15s;
+    background: none; border: none; font-size: 1.2em; cursor: pointer;
+    color: var(--sib-text-muted); transition: 0.15s; padding: 2px 8px; border-radius: 4px;
 }
+#sib-modal-close:hover { color: var(--sib-danger); background: rgba(255,255,255,0.05); }
 
-#sib-modal-close:hover {
-    opacity: 1;
-    background: rgba(255,255,255,0.08);
-}
-
-/* Вид */
-.sib-view {
-    flex: 1;
-    overflow-y: auto;
+/* ── Вкладки ──────────────────────────────────────────── */
+#sib-tabs {
     display: flex;
-    flex-direction: column;
+    border-bottom: 1px solid var(--sib-border);
+    background: var(--sib-bg-panel);
+    flex-shrink: 0;
+}
+.sib-tab {
+    flex: 1; padding: 12px 6px; background: none; border: none;
+    border-bottom: 2px solid transparent; color: var(--sib-text-muted);
+    cursor: pointer; font-size: 0.9em; font-weight: 600;
+    transition: 0.15s; white-space: nowrap;
+}
+.sib-tab:hover { color: var(--sib-text-main); background: rgba(255,255,255,0.03); }
+.sib-tab.sib-tab-active {
+    color: var(--sib-accent);
+    border-bottom-color: var(--sib-accent);
 }
 
-/* ── Список блоков ────────────────────────────────────── */
-
-#sib-block-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+.sib-tab-panel, .sib-view {
+    flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0;
 }
 
-.sib-empty {
-    text-align: center;
-    padding: 30px;
-    opacity: 0.5;
-    font-size: 0.9em;
-}
+/* ── Списки ───────────────────────────────────────────── */
+.sib-block-list-scroll { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.sib-empty { text-align: center; padding: 30px; color: var(--sib-text-muted); font-size: 0.95em; }
 
 .sib-block-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 12px;
-    border-radius: 8px;
-    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor, #444) 50%, transparent);
-    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #111) 40%, transparent);
-    transition: border-color 0.2s, background 0.2s;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; border-radius: 8px;
+    border: 1px solid var(--sib-border);
+    background: var(--sib-bg-panel);
+    transition: 0.2s;
 }
-
-.sib-block-item.sib-item-enabled {
-    border-color: color-mix(in srgb, var(--SmartThemeQuoteColor, #6c8) 50%, transparent);
-}
-
-.sib-item-left {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.sib-item-right {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.sib-item-name {
-    font-weight: 500;
-    font-size: 0.95em;
-}
-
-.sib-item-profile {
-    font-size: 0.75em;
-    opacity: 0.5;
-    font-family: monospace;
-}
+.sib-block-item.sib-item-enabled { border-color: var(--sib-success); }
+.sib-item-left { display: flex; align-items: center; gap: 12px; }
+.sib-item-right { display: flex; align-items: center; gap: 8px; }
+.sib-item-name { font-weight: 600; font-size: 1em; color: var(--sib-text-main); }
+.sib-item-profile { font-size: 0.8em; color: var(--sib-text-muted); font-family: monospace; margin-top: 2px;}
 
 .sib-btn-icon {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 0.95em;
-    padding: 3px 5px;
-    border-radius: 4px;
-    opacity: 0.6;
-    transition: opacity 0.15s, background 0.15s;
+    background: none; border: none; cursor: pointer; font-size: 1em;
+    padding: 4px 6px; border-radius: 4px; color: var(--sib-text-muted); transition: 0.15s;
 }
+.sib-btn-icon:hover { color: var(--sib-text-main); background: rgba(255,255,255,0.08); }
 
-.sib-btn-icon:hover {
-    opacity: 1;
-    background: rgba(255,255,255,0.08);
-}
-
-/* Тоггл switch */
-.sib-toggle-wrap {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    cursor: pointer;
-}
-
-.sib-toggle-wrap input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-    position: absolute;
-}
-
+/* ── Toggle switch ────────────────────────────────────── */
+.sib-toggle-wrap { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
+.sib-toggle-wrap input { opacity: 0; width: 0; height: 0; position: absolute; }
 .sib-toggle-slider {
-    width: 34px;
-    height: 18px;
-    background: rgba(255,255,255,0.15);
-    border-radius: 9px;
-    position: relative;
-    transition: background 0.2s;
-    flex-shrink: 0;
+    width: 36px; height: 20px; background: var(--sib-border-light);
+    border-radius: 10px; position: relative; transition: 0.2s; flex-shrink: 0;
 }
-
 .sib-toggle-slider::after {
-    content: '';
-    position: absolute;
-    width: 14px;
-    height: 14px;
-    border-radius: 50%;
-    background: #fff;
-    top: 2px;
-    left: 2px;
-    transition: transform 0.2s;
+    content: ''; position: absolute; width: 14px; height: 14px;
+    border-radius: 50%; background: #fff; top: 3px; left: 3px; transition: 0.2s;
 }
+.sib-toggle-wrap input:checked ~ .sib-toggle-slider { background: var(--sib-success); }
+.sib-toggle-wrap input:checked ~ .sib-toggle-slider::after { transform: translateX(16px); }
 
-.sib-toggle-wrap input:checked ~ .sib-toggle-slider {
-    background: var(--SmartThemeQuoteColor, #6c8);
-}
-
-.sib-toggle-wrap input:checked ~ .sib-toggle-slider::after {
-    transform: translateX(16px);
-}
-
-/* Футер списка */
-#sib-list-footer {
-    display: flex;
-    gap: 8px;
-    padding: 12px;
-    border-top: 1px solid var(--SmartThemeBorderColor, #444);
-    flex-shrink: 0;
-}
-
-/* ── Редактор блока ───────────────────────────────────── */
-
-#sib-editor-form {
-    flex: 1;
-    overflow-y: auto;
-    padding: 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.sib-field {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
+/* ── Редактор / Инпуты ────────────────────────────────── */
+.sib-editor-form { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.sib-field { display: flex; flex-direction: column; gap: 6px; }
 .sib-field label {
-    font-size: 0.8em;
-    font-weight: 600;
-    opacity: 0.7;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-size: 0.85em; font-weight: 600; color: var(--sib-text-muted);
+    text-transform: uppercase; letter-spacing: 0.05em;
 }
 
 .sib-field input[type="text"],
 .sib-field input[type="number"],
 .sib-field select,
 .sib-field textarea {
-    background: rgba(0,0,0,0.3);
-    border: 1px solid var(--SmartThemeBorderColor, #444);
-    border-radius: 6px;
-    color: inherit;
-    padding: 7px 10px;
-    font-size: 0.9em;
-    font-family: inherit;
-    transition: border-color 0.15s;
-    width: 100%;
-    box-sizing: border-box;
+    background: var(--sib-bg-input) !important;
+    border: 1px solid var(--sib-border) !important;
+    border-radius: 6px !important;
+    color: var(--sib-text-main) !important;
+    padding: 8px 12px !important;
+    font-size: 0.95em !important;
+    transition: 0.15s !important;
+    width: 100% !important;
+    box-shadow: none !important;
+}
+.sib-field input:focus, .sib-field select:focus, .sib-field textarea:focus {
+    outline: none !important; border-color: var(--sib-accent) !important;
 }
 
-.sib-field input:focus,
-.sib-field select:focus,
-.sib-field textarea:focus {
-    outline: none;
-    border-color: var(--SmartThemeQuoteColor, #6c8);
-}
-
-.sib-field-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 10px;
-}
-
+.sib-field-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 .sib-field-check label {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 0.9em;
-    text-transform: none;
-    letter-spacing: 0;
-    opacity: 1;
-    cursor: pointer;
+    display: flex; align-items: center; gap: 8px; font-size: 0.95em;
+    text-transform: none; letter-spacing: 0; color: var(--sib-text-main); cursor: pointer;
 }
-
-.sib-field-check input[type="checkbox"] {
-    width: 16px;
-    height: 16px;
-    accent-color: var(--SmartThemeQuoteColor, #6c8);
-}
+.sib-field-check input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--sib-accent); cursor: pointer; }
 
 .sib-field-prompt textarea {
-    min-height: 200px;
-    font-family: 'Courier New', monospace;
-    font-size: 0.83em;
-    line-height: 1.5;
-    resize: vertical;
+    min-height: 120px; font-family: 'Courier New', monospace !important;
+    font-size: 0.85em !important; line-height: 1.5; resize: vertical;
 }
 
-#sib-prompt-hint {
-    font-size: 0.78em;
-    opacity: 0.55;
-    line-height: 1.5;
-    padding: 6px 8px;
-    background: rgba(255,255,255,0.04);
-    border-radius: 5px;
-    border-left: 2px solid var(--SmartThemeQuoteColor, #6c8);
+.sib-prompt-hint {
+    font-size: 0.85em; color: var(--sib-text-muted); line-height: 1.4;
+    padding: 8px 10px; background: rgba(255,255,255,0.03);
+    border-radius: 6px; border-left: 2px solid var(--sib-accent);
+}
+.sib-prompt-hint code {
+    font-family: monospace; background: rgba(255,255,255,0.08);
+    padding: 2px 4px; border-radius: 4px; color: var(--sib-accent-hover);
 }
 
-#sib-prompt-hint code {
-    font-family: monospace;
-    background: rgba(255,255,255,0.08);
-    padding: 1px 4px;
-    border-radius: 3px;
+/* ── Пикеры ───────────────────────────────────────────── */
+.sib-img-char-picker {
+    display: flex; flex-direction: column; gap: 4px; padding: 8px;
+    border: 1px solid var(--sib-border); border-radius: 6px;
+    background: var(--sib-bg-input); max-height: 160px; overflow-y: auto;
+}
+.sib-img-char-pick-row {
+    display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+    border-radius: 4px; cursor: pointer; transition: 0.15s; color: var(--sib-text-main);
+}
+.sib-img-char-pick-row:hover { background: rgba(255,255,255,0.05); }
+.sib-img-char-pick-name { font-weight: 500; font-size: 0.95em; }
+
+/* ── Папки в списке инфоблоков ────────────────────────── */
+.sib-folder-wrap { display: flex; flex-direction: column; }
+.sib-folder-header {
+    display: flex; align-items: center; gap: 8px; padding: 10px 8px 8px; margin-top: 4px;
+    border-bottom: 1px solid var(--sib-border); color: var(--sib-accent);
+    font-weight: 700; font-size: 0.9em; text-transform: uppercase; letter-spacing: 0.05em;
+    cursor: pointer; user-select: none; transition: 0.2s;
+}
+.sib-folder-header:hover { color: var(--sib-accent-hover); }
+.sib-folder-chevron { color: var(--sib-text-muted); font-size: 0.9em; transition: transform 0.2s; }
+.sib-folder-content {
+    padding-left: 12px; border-left: 2px solid var(--sib-border-light);
+    margin-left: 12px; display: flex; flex-direction: column; gap: 8px; padding-top: 8px; padding-bottom: 4px;
 }
 
-#sib-editor-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 14px;
-    border-top: 1px solid var(--SmartThemeBorderColor, #444);
-    flex-shrink: 0;
+/* ── Кнопки и Футеры ──────────────────────────────────── */
+.sib-list-footer, .sib-editor-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-top: 1px solid var(--sib-border);
+    background: var(--sib-bg-panel); flex-shrink: 0; gap: 8px;
 }
-
-#sib-editor-footer-right {
-    display: flex;
-    gap: 8px;
-}
-
-/* ── Глобальные настройки ────────────────────────────── */
-
-#sib-view-global {
-    padding: 14px;
-    gap: 12px;
-}
-
-#sib-global-footer {
-    display: flex;
-    justify-content: space-between;
-    margin-top: auto;
-    padding-top: 14px;
-    border-top: 1px solid var(--SmartThemeBorderColor, #444);
-}
-
-/* ── Кнопки ───────────────────────────────────────────── */
+.sib-editor-footer-right { display: flex; gap: 10px; }
 
 .sib-btn {
-    padding: 7px 14px;
-    border-radius: 6px;
-    border: 1px solid transparent;
-    cursor: pointer;
-    font-size: 0.88em;
-    font-weight: 600;
-    transition: filter 0.15s, opacity 0.15s;
-    white-space: nowrap;
+    padding: 8px 16px; border-radius: 6px; border: 1px solid transparent;
+    cursor: pointer; font-size: 0.95em; font-weight: 600;
+    transition: 0.15s; white-space: nowrap; font-family: var(--sib-font);
 }
-
-.sib-btn:hover {
-    filter: brightness(1.15);
-}
-
-.sib-btn-primary {
-    background: var(--SmartThemeQuoteColor, #4a9);
-    color: #fff;
-    border-color: transparent;
-}
-
-.sib-btn-ghost {
-    background: rgba(255,255,255,0.06);
-    color: inherit;
-    border-color: var(--SmartThemeBorderColor, #444);
-}
-
-.sib-btn-ghost:hover {
-    background: rgba(255,255,255,0.12);
-}
-
-.sib-btn-danger {
-    background: rgba(192, 57, 43, 0.3);
-    color: #e74c3c;
-    border-color: #c0392b55;
-}
-
-.sib-btn-danger:hover {
-    background: rgba(192, 57, 43, 0.5);
-}
+.sib-btn:hover { filter: brightness(1.15); }
+.sib-btn-primary { background: var(--sib-accent); color: var(--sib-bg-main); }
+.sib-btn-ghost { background: rgba(255,255,255,0.05); color: var(--sib-text-main); border-color: var(--sib-border); }
+.sib-btn-ghost:hover { background: rgba(255,255,255,0.1); }
+.sib-btn-danger { background: rgba(243, 139, 168, 0.2); color: var(--sib-danger); border-color: rgba(243, 139, 168, 0.4); }
+.sib-btn-danger:hover { background: rgba(243, 139, 168, 0.3); }
 
 /* ── Мобильная адаптация ──────────────────────────────── */
-
-@media (max-width: 500px) {
-    .sib-field-row {
-        grid-template-columns: 1fr 1fr;
-    }
-
-    #sib-editor-footer {
-        flex-wrap: wrap;
-        gap: 8px;
-    }
-}
-
-/* ==========================================================================
-   📱 MOBILE FIX (ST-Info-Blocks Edition)
-   ========================================================================== */
-
-/* 1. Спасаем Flexbox оверлея от посягательств jQuery. 
-   Оверлей должен оставаться flex, чтобы центрировать окно, 
-   пока он не скрыт (display: none). */
-#sib-modal-overlay:not([style*="none"]) {
-    display: flex !important;
-}
-
-/* 2. Адаптация под мобильные устройства */
 @media screen and (max-width: 768px) {
-    
-    /* Растягиваем оверлей на весь экран без отступов */
-    #sib-modal-overlay {
-        padding: 0 !important;
-    }
-
-    /* Модальное окно превращается в полноценный мобильный экран */
+    #sib-modal-overlay { padding: 0 !important; }
     #sib-modal {
-        width: 100vw !important;
-        max-width: 100vw !important;
-        height: 100dvh !important; /* Используем динамический вьюпорт */
-        max-height: 100dvh !important;
-        border-radius: 0 !important; /* Убираем скругления, когда окно на весь экран */
-        border: none !important;
-        top: 0 !important;
-        left: 0 !important;
-        position: fixed !important;
+        width: 100vw !important; max-width: 100vw !important;
+        height: 100dvh !important; max-height: 100dvh !important;
+        border-radius: 0 !important; border: none !important;
     }
-
-    /* Внутренние вьюхи (список, редактор) должны занимать всё свободное место */
-    .sib-view {
-        flex: 1 !important;
-        overflow-y: auto !important;
-        -webkit-overflow-scrolling: touch; /* Плавный скролл для iOS */
-    }
-
-    /* Адаптируем поля ввода в редакторе, чтобы по ним было легче попадать пальцем */
-    .sib-field input, 
-    .sib-field select, 
-    .sib-field textarea {
-        font-size: 16px !important; /* Предотвращает авто-зум в Safari на iPhone */
-    }
-
-    /* Футеры прижимаем к нижней безопасной зоне (для телефонов с "челками") */
-    #sib-list-footer, 
-    #sib-editor-footer, 
-    #sib-global-footer {
-        padding-bottom: calc(12px + env(safe-area-inset-bottom)) !important;
-        background: var(--SmartThemeBlurTintColor, #1a1a2e) !important;
-    }
-
-    /* Увеличиваем кнопки в футере для удобства */
-    .sib-btn {
-        padding: 12px 16px !important;
-        flex: 1; /* Кнопки делят ширину поровну */
-        justify-content: center;
-        display: flex;
-    }
+    .sib-field-row { grid-template-columns: 1fr; gap: 8px; }
+    .sib-editor-footer { flex-wrap: wrap; }
+    .sib-btn { padding: 12px 16px; flex: 1; text-align: center; justify-content: center; display: flex; }
 }

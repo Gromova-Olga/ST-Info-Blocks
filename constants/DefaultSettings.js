@@ -1,17 +1,18 @@
-// constants/DefaultSettings.js
+// constants/DefaultSettings.js — ST-Info-Blocks (unified)
 
 export const extensionName = 'ST-Info-Blocks';
 
 export const defaultSettings = {
     enabled: true,
 
-    // Список инфоблоков
-    blocks: [
+    // ── Инфоблоки ────────────────────────────────────────────
+    infoBlocks: [
         {
             id: 'example-status',
             name: '📊 Статус сцены',
             enabled: false,
-            profile: '',          // имя профиля ST Connection Manager
+            profile: '',
+            folder: '',
             groupId: '',
             temperature: 0.7,
             maxTokens: 800,
@@ -29,10 +30,52 @@ export const defaultSettings = {
         }
     ],
 
-    // Глобальные настройки отображения
+    // ── Блоки картинок ────────────────────────────────────────
+    imageBlocks: [
+        {
+            id: 'example-image',
+            name: '🖼️ Промт сцены',
+            enabled: false,
+            mode: 'request',   // 'request' | 'inject'
+            profile: '',
+            groupId: '',
+            temperature: 0.7,
+            maxTokens: 400,
+            contextMessages: 6,
+            triggerOnSwipe: true,
+            characterIds: [],
+            promptInstruction: `You are a Stable Diffusion prompt writer.
+Based on the last few messages of the roleplay scene, write a concise image generation prompt.
+
+Active characters in this scene:
+{{characters}}
+
+Rules:
+- Write ONLY the prompt, no explanations
+- Start with the scene type: (portrait), (scene), (close-up), etc.
+- Include lighting, atmosphere, art style at the end
+- Max 120 words
+- Comma-separated tags`,
+            htmlTemplate: `<div class="sib-block sib-image-prompt">
+  <div class="sib-block-title">🖼️ Image Prompt</div>
+  <div class="sib-image-prompt-text">{{prompt}}</div>
+</div>`,
+            injectionTemplate: `[IMAGE PROMPT INSTRUCTION]
+After your reply, append an image generation prompt on a new line wrapped in [IMG]...[/IMG] tags.
+Characters present: {{characters}}
+Write a concise Stable Diffusion prompt describing the scene.
+[/IMAGE PROMPT INSTRUCTION]`,
+        }
+    ],
+
+    // ── Персонажи (для image-блоков) ─────────────────────────
+    characters: [],
+    environments: [],
+
+    // ── Общие настройки отображения ──────────────────────────
     display: {
-        collapseByDefault: false,   // сворачивать блоки при вставке
-        showBlockName: true,         // показывать заголовок блока
-        animateIn: true              // анимация появления
+        collapseByDefault: false,
+        showBlockName: true,
+        animateIn: true,
     }
 };
