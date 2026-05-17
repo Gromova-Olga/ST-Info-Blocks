@@ -6,7 +6,13 @@ import { eventSource, event_types } from '../../../../script.js';
 import { extensionName, defaultSettings } from './constants/DefaultSettings.js';
 import { getSettings, saveSettings } from './core/StateManager.js';
 import { onInfoMessageReceived, onInfoMessageSwiped } from './core/InfoBlockRunner.js';
-import { onImageMessageReceived, onImageMessageSwiped, updateInjectionPrompt } from './core/ImageBlockRunner.js';
+import {
+    onImageMessageReceived,
+    onImageMessageSwiped,
+    updateInjectionPrompt,
+    regenImageBlocksForMessage,
+    injectRegenButton,
+} from './core/ImageBlockRunner.js';
 import { initSettingsModal, openSettingsModal } from './ui/SettingsModal.js';
 
 const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
@@ -42,8 +48,28 @@ $(document).ready(async function () {
             </div>
         `);
 
-        // Обработчики открытия
+        // Открытие модалки
         $(document).on('click', '#sib-open-modal-btn, #sib-top-button, #sib-wand-button', openSettingsModal);
+
+        // ── Кнопка перегенерации промта (делегированный обработчик) ──
+        $(document).on('click', '.sib-img-regen-btn', async function () {
+            const btn = $(this);
+            const mesId = parseInt(btn.attr('data-mesid'), 10);
+            if (isNaN(mesId)) {
+                console.error(`[${extensionName}] regen btn: не удалось прочитать mesid`, btn[0]);
+                return;
+            }
+
+            btn.prop('disabled', true).text('⏳');
+            try {
+                await regenImageBlocksForMessage(mesId);
+            } catch (err) {
+                console.error(`[${extensionName}] Ошибка регена:`, err);
+                // Кнопка пересоздастся через CHARACTER_MESSAGE_RENDERED после рендера,
+                // если рендер провалился — восстанавливаем вручную
+                btn.prop('disabled', false).text('🔄 Промт');
+            }
+        });
 
         // ── События генерации (injection-режим image-блоков) ──
         eventSource.on(event_types.GENERATION_STARTED, () => {
@@ -62,6 +88,40 @@ $(document).ready(async function () {
         eventSource.on(event_types.MESSAGE_SWIPED, (mesId) => {
             onInfoMessageSwiped(mesId);
             onImageMessageSwiped(mesId);
+        });
+
+        // ── Кнопки регена при загрузке / смене чата ──────────
+        function injectRegenButtonsForAllPosts() {
+            $('.mes[is_user="false"]').each(function () {
+                const mesId = $(this).attr('mesid');
+                if (mesId !== undefined) injectRegenButton(mesId);
+            });
+        }
+
+        let observerDebounceTimer = null;
+        const chatObserver = new MutationObserver(() => {
+            clearTimeout(observerDebounceTimer);
+            observerDebounceTimer = setTimeout(injectRegenButtonsForAllPosts, 300);
+        });
+
+        function attachChatObserver() {
+            const chatContainer = document.getElementById('chat');
+            if (chatContainer) {
+                chatObserver.disconnect();
+                chatObserver.observe(chatContainer, { childList: true, subtree: false });
+            }
+        }
+
+        attachChatObserver();
+        eventSource.on(event_types.CHAT_CHANGED, () => {
+            setTimeout(attachChatObserver, 100);
+            setTimeout(injectRegenButtonsForAllPosts, 1000);
+        });
+
+        // ── Кнопка регена при каждом рендере поста ────────────
+        // Срабатывает при загрузке чата, свайпах, и после нашего updateMessageBlock
+        eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (mesId) => {
+            injectRegenButton(mesId);
         });
 
         // Первичный injection
