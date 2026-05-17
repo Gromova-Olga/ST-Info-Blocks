@@ -16,6 +16,8 @@ if (eventSource && event_types) {
     eventSource.on(event_types.GENERATION_STARTED, () => { isStGenerating = true; });
     eventSource.on(event_types.GENERATION_STOPPED, () => { isStGenerating = false; });
     eventSource.on(event_types.MESSAGE_RECEIVED,   () => { isStGenerating = false; });
+    // Дополнительный сброс — GENERATION_STOPPED не всегда стреляет
+    eventSource.on(event_types.GENERATION_ENDED,   () => { isStGenerating = false; });
 }
 
 // ── Injection mode ────────────────────────────────────────────
@@ -37,11 +39,9 @@ export function updateInjectionPrompt() {
         const hasCharMacro = template.includes('{{characters}}');
         const hasEnvMacro = template.includes('{{environments}}');
 
-        // Если макросы есть в тексте — заменяем их
         if (hasCharMacro) template = template.replace(/\{\{characters\}\}/g, charStr);
         if (hasEnvMacro) template = template.replace(/\{\{environments\}\}/g, envStr || '');
 
-        // АВТОИНЖЕКТ: Если макросов нет, собираем "шапку" из включенных данных
         let autoInjectPrefix = '';
         if (!hasEnvMacro && envStr) {
             autoInjectPrefix += `[ENVIRONMENT / LOCATION]\n${envStr}\n\n`;
@@ -50,7 +50,6 @@ export function updateInjectionPrompt() {
             autoInjectPrefix += `[ACTIVE CHARACTERS]\n${charStr}\n\n`;
         }
         
-        // Клеим шапку к твоему шаблону
         return autoInjectPrefix + template;
     });
 
@@ -110,11 +109,9 @@ async function runImageGroup(group, mesId) {
             const charStr = buildCharactersString(b.characterIds);
             const envStr  = buildEnvironmentsString(b.environmentIds);
             
-            // На случай если макрос есть
             const instructionWithEnv = (b.promptInstruction || '').replace(/\{\{environments\}\}/g, envStr || '');
             const bCopy = { ...b, promptInstruction: instructionWithEnv };
 
-            // АВТОИНЖЕКТ для отдельного запроса:
             let contextPayload = charStr;
             if (envStr) {
                 contextPayload = `--- LOCATION / ENVIRONMENT ---\n${envStr}\n\n--- CHARACTERS ---\n${charStr}`;
@@ -148,6 +145,74 @@ async function runImageGroup(group, mesId) {
         console.error(`[${extensionName}] ImageBlocks ошибка:`, err);
     }
 }
+
+// ── Regen ─────────────────────────────────────────────────────
+
+/**
+ * Удаляет старый промт из chat[mesId].mes и перезапускает генерацию.
+ * Вызывается кнопкой 🔄 в посте.
+ */
+export async function regenImageBlocksForMessage(mesId) {
+    // Пользователь нажал кнопку вручную — флаг мог застрять.
+    isStGenerating = false;
+
+    // Удаляем старую кнопку сразу — после рендера injectRegenButton создаст новую
+    $(`.mes[mesid="${mesId}"] .sib-img-regen-btn`).remove();
+
+    // Срезаем маркер и всё что после него
+    if (chat[mesId]) {
+        const markerIdx = chat[mesId].mes.indexOf(IMAGE_MARKER);
+        if (markerIdx !== -1) {
+            chat[mesId].mes = chat[mesId].mes.slice(0, markerIdx).trimEnd();
+        }
+        saveChatDebounced();
+        await updateMessageBlock(mesId, chat[mesId]);
+    }
+
+    // Чистим DOM-контейнер с промтом
+    clearImageMessageBlocks(mesId);
+
+    // Маркера больше нет — защита от дублей пропустит
+    await runAllImageBlocks(mesId, { isSwipe: false });
+}
+
+/**
+ * Вставляет кнопку 🔄 в DOM поста, если:
+ * - в тексте сообщения есть IMAGE_MARKER (промт уже был сгенерирован)
+ * - кнопки ещё нет в DOM
+ * Вызывается из обработчика CHARACTER_MESSAGE_RENDERED.
+ */
+export function injectRegenButton(mesId) {
+    const hasRequestBlocks = getEnabledImageBlocks().some(b => b.mode !== 'inject');
+    if (!hasRequestBlocks) return;
+
+    const mesEl = $(`.mes[mesid="${mesId}"]`);
+    if (!mesEl.length) return;
+
+    if (mesEl.find('.sib-img-regen-btn').length) return;
+
+    // Проверяем наличие маркера двумя способами:
+    // 1. В chat[] — надёжно когда чат уже загружен
+    // 2. В тексте mes_text — надёжно при рендере живого поста
+    const inChat = chat[mesId]?.mes?.includes(IMAGE_MARKER);
+    const inDom  = mesEl.find('.mes_text').html()?.includes('sib-img-processed');
+    if (!inChat && !inDom) return;
+
+    const btn = $(`<button class="sib-img-regen-btn" data-mesid="${mesId}" title="Перегенерировать промт картинки">🔄 Промт</button>`);
+    
+    // Вставляем после image-container, или после info-container, или после mes_text
+    const imgContainer = mesEl.find('.sib-image-container');
+    const infoContainer = mesEl.find('.sib-info-container');
+    if (imgContainer.length) {
+        imgContainer.after(btn);
+    } else if (infoContainer.length) {
+        infoContainer.after(btn);
+    } else {
+        mesEl.find('.mes_text').after(btn);
+    }
+}
+
+// ── Event handlers ────────────────────────────────────────────
 
 export function onImageMessageReceived(mesId) {
     const targetId = mesId ?? getLastBotMesId();
