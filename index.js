@@ -5,14 +5,18 @@ import { eventSource, event_types } from '../../../../script.js';
 
 import { extensionName, defaultSettings } from './constants/DefaultSettings.js';
 import { getSettings, saveSettings } from './core/StateManager.js';
-import { onInfoMessageReceived, onInfoMessageSwiped } from './core/InfoBlockRunner.js';
+import { onInfoMessageReceived, onInfoMessageSwiped, runAllInfoBlocks } from './core/InfoBlockRunner.js';
 import {
     onImageMessageReceived,
     onImageMessageSwiped,
     updateInjectionPrompt,
     regenImageBlocksForMessage,
     injectRegenButton,
+    runAllImageBlocks
 } from './core/ImageBlockRunner.js';
+
+// Удален старый импорт BlockRunner.js
+
 import { initSettingsModal, openSettingsModal } from './ui/SettingsModal.js';
 
 const extensionFolderPath = `scripts/extensions/third-party/${extensionName}`;
@@ -51,7 +55,7 @@ $(document).ready(async function () {
         // Открытие модалки
         $(document).on('click', '#sib-open-modal-btn, #sib-top-button, #sib-wand-button', openSettingsModal);
 
-        // ── Кнопка перегенерации промта (делегированный обработчик) ──
+        // ── Кнопка перегенерации промта ──────────────────────────────
         $(document).on('click', '.sib-img-regen-btn', async function () {
             const btn = $(this);
             const mesId = parseInt(btn.attr('data-mesid'), 10);
@@ -65,18 +69,67 @@ $(document).ready(async function () {
                 await regenImageBlocksForMessage(mesId);
             } catch (err) {
                 console.error(`[${extensionName}] Ошибка регена:`, err);
-                // Кнопка пересоздастся через CHARACTER_MESSAGE_RENDERED после рендера,
-                // если рендер провалился — восстанавливаем вручную
                 btn.prop('disabled', false).text('🔄 Промт');
             }
         });
+        
+        // ── Обработчик клика по молоточку (ручная генерация) ─────────
+        $(document).on('click', '.sib-manual-gen-btn', async function () {
+            const btn = $(this);
+            const mesId = btn.attr('data-mesid');
+            if (!mesId) return;
 
-        // ── События генерации (injection-режим image-блоков) ──
+            const icon = btn.find('i');
+            // Включаем анимацию загрузки
+            icon.removeClass('fa-hammer').addClass('fa-spinner fa-spin');
+
+            try {
+                // Запускаем ТОЛЬКО актуальные раннеры
+                await Promise.allSettled([
+                    runAllInfoBlocks(mesId, { isSwipe: false }),
+                    runAllImageBlocks(mesId, { isSwipe: false })
+                ]);
+            } catch (err) {
+                console.error(`[${extensionName}] Ошибка ручной генерации:`, err);
+                toastr.error('Не удалось сгенерировать блоки вручную.');
+            } finally {
+                // Возвращаем иконку обратно
+                icon.removeClass('fa-spinner fa-spin').addClass('fa-hammer');
+            }
+        });
+
+        // ── Функция создания кнопки молоточка ────────────────────────
+        function injectManualGenButton(mesId) {
+            const mesEl = $(`.mes[mesid="${mesId}"]`);
+            // Только для ответов бота
+            if (!mesEl.length || mesEl.attr('is_user') === 'true') return;
+    
+            // В Таверне кнопки управления сообщением лежат в .mes_buttons
+            const btnContainer = mesEl.find('.mes_buttons');
+            if (!btnContainer.length) return;
+        
+            // Защита от дублей кнопки
+            if (btnContainer.find('.sib-manual-gen-btn').length) return;
+        
+            // Иконка молоточка
+            const btn = $(`
+                <div class="mes_button sib-manual-gen-btn interactable" 
+                    title="Принудительно сгенерировать пропущенные инфоблоки" 
+                    data-mesid="${mesId}">
+                <i class="fas fa-hammer"></i>
+            </div>
+            `);
+        
+            // Добавляем в конец списка кнопок
+            btnContainer.append(btn);
+        }
+
+        // ── События генерации (injection-режим image-блоков) ─────────
         eventSource.on(event_types.GENERATION_STARTED, () => {
             updateInjectionPrompt();
         });
 
-        // ── Входящие сообщения ────────────────────────────────
+        // ── Входящие сообщения ───────────────────────────────────────
         eventSource.on(event_types.MESSAGE_RECEIVED, (mesId) => {
             const mesEl = $(`.mes[mesid="${mesId}"]`);
             if (mesEl.attr('is_user') === 'true') return;
@@ -84,17 +137,20 @@ $(document).ready(async function () {
             onImageMessageReceived(mesId);
         });
 
-        // ── Свайп ─────────────────────────────────────────────
+        // ── Свайп ────────────────────────────────────────────────────
         eventSource.on(event_types.MESSAGE_SWIPED, (mesId) => {
             onInfoMessageSwiped(mesId);
             onImageMessageSwiped(mesId);
         });
 
-        // ── Кнопки регена при загрузке / смене чата ──────────
+        // ── Кнопки регена при загрузке / смене чата ──────────────────
         function injectRegenButtonsForAllPosts() {
             $('.mes[is_user="false"]').each(function () {
                 const mesId = $(this).attr('mesid');
-                if (mesId !== undefined) injectRegenButton(mesId);
+                if (mesId !== undefined) {
+                    injectRegenButton(mesId);
+                    injectManualGenButton(mesId);
+                }
             });
         }
 
@@ -118,10 +174,10 @@ $(document).ready(async function () {
             setTimeout(injectRegenButtonsForAllPosts, 1000);
         });
 
-        // ── Кнопка регена при каждом рендере поста ────────────
-        // Срабатывает при загрузке чата, свайпах, и после нашего updateMessageBlock
+        // ── Кнопка регена при каждом рендере поста ───────────────────
         eventSource.on(event_types.CHARACTER_MESSAGE_RENDERED, (mesId) => {
             injectRegenButton(mesId);
+            injectManualGenButton(mesId);
         });
 
         // Первичный injection
