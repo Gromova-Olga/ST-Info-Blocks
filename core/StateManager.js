@@ -143,3 +143,62 @@ export function buildEnvironmentsString(environmentIds) {
     if (!envs.length) return '';
     return envs.map(e => `${e.name}: ${e.description || ''}`).join('\n');
 }
+
+// ── Экспорт и Импорт ─────────────────────────────────────────
+
+export function exportData() {
+    const data = getSettings();
+    // Превращаем настройки в красивый JSON с отступами
+    const dataStr = JSON.stringify(data, null, 2);
+    
+    // Создаем виртуальный файл
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    // Эмулируем клик по ссылке для скачивания
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ST-Info-Blocks-Backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    
+    // Убираем за собой
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toastr.success('Настройки успешно экспортированы!', 'ST-Info-Blocks');
+}
+
+export async function importData(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+            try {
+                const parsed = JSON.parse(e.target.result);
+                if (typeof parsed !== 'object' || !parsed) {
+                    throw new Error('Неверный формат файла');
+                }
+                
+                const s = getSettings();
+                
+                // Аккуратно переносим данные из файла в текущий стейт
+                s.infoBlocks = parsed.infoBlocks || [];
+                s.imageBlocks = parsed.imageBlocks || [];
+                s.characters = parsed.characters || [];
+                s.environments = parsed.environments || [];
+                if (parsed.display) {
+                    s.display = { ...s.display, ...parsed.display };
+                }
+                
+                saveSettings();
+                toastr.success('Настройки загружены! Страница перезагрузится через пару секунд...', 'ST-Info-Blocks');
+                resolve();
+            } catch (err) {
+                toastr.error('Ошибка импорта: ' + err.message, 'ST-Info-Blocks');
+                reject(err);
+            }
+        };
+        
+        reader.readAsText(file);
+    });
+}
