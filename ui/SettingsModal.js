@@ -6,6 +6,7 @@ import {
     getCharacters, getCharacterById, addCharacter, updateCharacter, removeCharacter,
     getEnvironments, getEnvironmentById, addEnvironment, updateEnvironment, removeEnvironment,
     getSettings, saveSettings, generateId,
+    exportData, importData // <-- ДОБАВИЛИ ИМПОРТ ФУНКЦИЙ
 } from '../core/StateManager.js';
 
 let activeTab = 'info';
@@ -181,6 +182,10 @@ function buildModalHTML() {
             <div id="sib-view-image-char-editor" class="sib-view" style="display:none;">
                 <div id="sib-char-editor-form" class="sib-editor-form">
                     <div class="sib-field"><label>Имя персонажа</label><input type="text" id="sib-char-ed-name" /></div>
+                    <div class="sib-field">
+                        <label>Папка (категория)</label>
+                        <input type="text" id="sib-char-ed-folder" placeholder="Например: Выжившие" />
+                    </div>
                     <div class="sib-field"><label>Внешность</label><textarea id="sib-char-ed-appearance" rows="3"></textarea></div>
                     
                     <!-- Динамические аутфиты -->
@@ -212,6 +217,10 @@ function buildModalHTML() {
             <div id="sib-view-image-env-editor" class="sib-view" style="display:none;">
                 <div id="sib-env-editor-form" class="sib-editor-form">
                     <div class="sib-field"><label>Название локации</label><input type="text" id="sib-env-ed-name" /></div>
+                    <div class="sib-field">
+                    <label>Папка (категория)</label>
+                    <input type="text" id="sib-env-ed-folder" placeholder="Например: База" />
+                </div>
                     <div class="sib-field"><label>Описание</label><textarea id="sib-env-ed-desc" rows="4"></textarea></div>
                 </div>
                 <div class="sib-editor-footer">
@@ -232,6 +241,17 @@ function buildModalHTML() {
                     <div class="sib-field sib-field-check"><label><input type="checkbox" id="sib-g-collapse" /> Сворачивать блоки по умолчанию</label></div>
                     <div class="sib-field sib-field-check"><label><input type="checkbox" id="sib-g-showname" /> Показывать заголовок блока</label></div>
                     <div class="sib-field sib-field-check"><label><input type="checkbox" id="sib-g-animate" /> Анимация появления</label></div>
+                    
+                    <!-- ── ДОБАВЛЕННЫЙ БЛОК БЭКАПОВ ── -->
+                    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                        <label style="display:block; margin-bottom:10px; font-weight:bold; color:var(--SmartThemeQuoteColor);">Резервное копирование</label>
+                        <div style="display:flex; gap:10px;">
+                            <button id="sib-btn-export" class="sib-btn sib-btn-primary" style="flex:1;"><i class="fas fa-file-export"></i> Экспорт (Backup)</button>
+                            <button id="sib-btn-import" class="sib-btn sib-btn-danger" style="flex:1;"><i class="fas fa-file-import"></i> Импорт</button>
+                            <input type="file" id="sib-import-file" accept=".json" style="display:none;" />
+                        </div>
+                        <div style="font-size:0.8em; opacity:0.6; margin-top:5px;">Импорт полностью перезапишет текущие настройки, блоки и персонажей!</div>
+                    </div>
                 </div>
                 <div class="sib-editor-footer">
                     <div></div>
@@ -304,6 +324,29 @@ function bindModalEvents() {
 
     // Global
     $('#sib-btn-global-save').on('click', saveGlobalSettings);
+
+    // ── ОБРАБОТЧИКИ ЭКСПОРТА И ИМПОРТА ──
+    $('#sib-btn-export').on('click', exportData);
+    
+    $('#sib-btn-import').on('click', () => {
+        if (confirm('Внимание! Это действие полностью перезапишет все твои блоки, персонажей и локации. Продолжить?')) {
+            $('#sib-import-file').click();
+        }
+    });
+
+    $('#sib-import-file').on('change', async function() {
+        const file = this.files[0];
+        if (!file) return;
+        try {
+            await importData(file);
+            $(this).val(''); // Очищаем input
+            
+            // Перезагружаем страницу, чтобы изменения вступили в силу
+            setTimeout(() => location.reload(), 2000);
+        } catch (e) {
+            $(this).val('');
+        }
+    });
 }
 
 function switchTab(tab) {
@@ -319,7 +362,7 @@ function switchTab(tab) {
 
 // ── INFO BLOCKS ──────────────────────────────────────────────
 function showInfoView(name) { $('#sib-tab-info .sib-view').hide(); $(`#sib-view-info-${name}`).show(); }
-function renderInfoBlockList() { /* Аналогично оригиналу */ 
+function renderInfoBlockList() { 
     const blocks = getInfoBlocks(); const list = $('#sib-info-block-list').empty();
     if (!blocks.length) return list.append('<div class="sib-empty">Нет блоков</div>');
     const grouped = {}; blocks.forEach(b => { const f = b.folder?.trim() || '—'; (grouped[f] = grouped[f] || []).push(b); });
@@ -408,14 +451,13 @@ function saveImageEditor() {
 function renderCharList() {
     const chars = getCharacters(); const list = $('#sib-char-list').empty();
     if (!chars.length) return list.append('<div class="sib-empty">Нет персонажей.</div>');
-    chars.forEach(c => {
-        const item = $(`<div class="sib-block-item">
-            <div class="sib-item-left"><div><div class="sib-item-name">${c.name}</div><div class="sib-item-profile">${c.appearance || '—'}</div></div></div>
-            <div class="sib-item-right"><button class="sib-char-edit sib-btn-icon">✏️</button></div>
-        </div>`);
-        item.find('.sib-char-edit').on('click', () => openCharEditor(c.id));
-        list.append(item);
-    });
+    
+    const grouped = {}; 
+    chars.forEach(c => { const f = c.folder?.trim() || '—'; (grouped[f] = grouped[f] || []).push(c); });
+    
+    for (const [fName, fChars] of Object.entries(grouped)) {
+        list.append(buildFolderSectionForItems(fName, fChars, 'char'));
+    }
 }
 function renderOutfits() {
     const container = $('#sib-char-outfits-container').empty();
@@ -446,7 +488,9 @@ function renderOutfits() {
 function openCharEditor(charId) {
     const c = charId ? getCharacterById(charId) : null;
     $('#sib-modal').data('editing-char-id', charId || null);
-    $('#sib-char-ed-name').val(c?.name || ''); $('#sib-char-ed-appearance').val(c?.appearance || '');
+    $('#sib-char-ed-name').val(c?.name || ''); 
+    $('#sib-char-ed-folder').val(c?.folder || ''); 
+    $('#sib-char-ed-appearance').val(c?.appearance || '');
     
     currentOutfits = c?.outfits ? JSON.parse(JSON.stringify(c.outfits)) : [];
     if (!currentOutfits.length && c?.outfit) currentOutfits.push({ id: generateId('out'), name: 'Базовый', value: c.outfit });
@@ -455,13 +499,15 @@ function openCharEditor(charId) {
     renderOutfits();
     $('#sib-char-btn-delete').toggle(!!charId); showImageView('char-editor');
 }
+
 function saveCharEditor() {
     const name = $('#sib-char-ed-name').val().trim();
+    const folder = $('#sib-char-ed-folder').val().trim(); 
     const appearance = $('#sib-char-ed-appearance').val().trim();
     if (!name) return alert('Введите имя персонажа');
     
     const id = $('#sib-modal').data('editing-char-id');
-    const data = { name, appearance, outfits: currentOutfits, activeOutfitId: currentActiveOutfitId };
+    const data = { name, folder, appearance, outfits: currentOutfits, activeOutfitId: currentActiveOutfitId };
     if (id) updateCharacter(id, data); else addCharacter({ id: generateId('sib-char'), ...data });
     renderCharList(); showImageView('chars');
 }
@@ -470,28 +516,31 @@ function saveCharEditor() {
 function renderEnvList() {
     const envs = getEnvironments(); const list = $('#sib-env-list').empty();
     if (!envs.length) return list.append('<div class="sib-empty">Нет локаций.</div>');
-    envs.forEach(e => {
-        const item = $(`<div class="sib-block-item">
-            <div class="sib-item-left"><div><div class="sib-item-name">${e.name}</div><div class="sib-item-profile">${e.description || '—'}</div></div></div>
-            <div class="sib-item-right"><button class="sib-env-edit sib-btn-icon">✏️</button></div>
-        </div>`);
-        item.find('.sib-env-edit').on('click', () => openEnvEditor(e.id));
-        list.append(item);
-    });
+    
+    const grouped = {}; 
+    envs.forEach(e => { const f = e.folder?.trim() || '—'; (grouped[f] = grouped[f] || []).push(e); });
+    
+    for (const [fName, fEnvs] of Object.entries(grouped)) {
+        list.append(buildFolderSectionForItems(fName, fEnvs, 'env'));
+    }
 }
 function openEnvEditor(envId) {
     const e = envId ? getEnvironmentById(envId) : null;
     $('#sib-modal').data('editing-env-id', envId || null);
-    $('#sib-env-ed-name').val(e?.name || ''); $('#sib-env-ed-desc').val(e?.description || '');
+    $('#sib-env-ed-name').val(e?.name || ''); 
+    $('#sib-env-ed-folder').val(e?.folder || ''); 
+    $('#sib-env-ed-desc').val(e?.description || '');
     $('#sib-env-btn-delete').toggle(!!envId); showImageView('env-editor');
 }
+
 function saveEnvEditor() {
     const name = $('#sib-env-ed-name').val().trim();
+    const folder = $('#sib-env-ed-folder').val().trim(); 
     const description = $('#sib-env-ed-desc').val().trim();
     if (!name) return alert('Введите название локации');
     
     const id = $('#sib-modal').data('editing-env-id');
-    if (id) updateEnvironment(id, { name, description }); else addEnvironment({ id: generateId('sib-env'), name, description });
+    if (id) updateEnvironment(id, { name, folder, description }); else addEnvironment({ id: generateId('sib-env'), name, folder, description });
     renderEnvList(); showImageView('envs');
 }
 
@@ -499,16 +548,35 @@ function saveEnvEditor() {
 function renderCharPicker(selectedIds = []) {
     const picker = $('#sib-img-char-picker').empty(); const chars = getCharacters();
     if (!chars.length) return picker.append('<div style="opacity:0.5;font-size:0.85em;padding:4px;">Нет персонажей.</div>');
-    chars.forEach(c => {
-        picker.append(`<label class="sib-img-char-pick-row"><input type="checkbox" value="${c.id}" ${selectedIds.includes(c.id) ? 'checked' : ''} /><span class="sib-img-char-pick-name">${c.name}</span></label>`);
-    });
+    
+    const grouped = {}; 
+    chars.forEach(c => { const f = c.folder?.trim() || '—'; (grouped[f] = grouped[f] || []).push(c); });
+    
+    for (const [fName, fChars] of Object.entries(grouped)) {
+        const groupEl = $(`<div class="sib-picker-group"><div class="sib-picker-header">${fName} <i class="fas fa-chevron-down" style="font-size:0.7em; opacity:0.5; margin-left:5px;"></i></div><div class="sib-picker-content" style="display:none;"></div></div>`);
+        fChars.forEach(c => {
+            groupEl.find('.sib-picker-content').append(`<label class="sib-img-char-pick-row"><input type="checkbox" value="${c.id}" ${selectedIds.includes(c.id) ? 'checked' : ''} /><span class="sib-img-char-pick-name">${c.name}</span></label>`);
+        });
+        groupEl.find('.sib-picker-header').on('click', function() { $(this).next('.sib-picker-content').slideToggle(150); });
+        picker.append(groupEl);
+    }
 }
+
 function renderEnvPicker(selectedIds = []) {
     const picker = $('#sib-img-env-picker').empty(); const envs = getEnvironments();
     if (!envs.length) return picker.append('<div style="opacity:0.5;font-size:0.85em;padding:4px;">Нет локаций.</div>');
-    envs.forEach(e => {
-        picker.append(`<label class="sib-img-char-pick-row"><input type="checkbox" value="${e.id}" ${selectedIds.includes(e.id) ? 'checked' : ''} /><span class="sib-img-char-pick-name">${e.name}</span></label>`);
-    });
+    
+    const grouped = {}; 
+    envs.forEach(e => { const f = e.folder?.trim() || '—'; (grouped[f] = grouped[f] || []).push(e); });
+    
+    for (const [fName, fEnvs] of Object.entries(grouped)) {
+        const groupEl = $(`<div class="sib-picker-group"><div class="sib-picker-header">${fName} <i class="fas fa-chevron-down" style="font-size:0.7em; opacity:0.5; margin-left:5px;"></i></div><div class="sib-picker-content" style="display:none;"></div></div>`);
+        fEnvs.forEach(e => {
+            groupEl.find('.sib-picker-content').append(`<label class="sib-img-char-pick-row"><input type="checkbox" value="${e.id}" ${selectedIds.includes(e.id) ? 'checked' : ''} /><span class="sib-img-char-pick-name">${e.name}</span></label>`);
+        });
+        groupEl.find('.sib-picker-header').on('click', function() { $(this).next('.sib-picker-content').slideToggle(150); });
+        picker.append(groupEl);
+    }
 }
 
 // ── GLOBAL & HELPERS ─────────────────────────────────────────
@@ -527,5 +595,29 @@ function buildFolderSection(folderName, folderBlocks, type) {
         item.find('.sib-info-edit').on('click', () => openInfoEditor(b.id)); content.append(item);
     });
     header.on('click', function () { const hidden = content.is(':hidden'); content.slideToggle(200); header.find('.sib-folder-icon').toggleClass('fa-folder', !hidden).toggleClass('fa-folder-open', hidden); header.find('.sib-folder-chevron').css('transform', hidden ? 'rotate(90deg)' : 'rotate(0deg)'); });
+    return $('<div class="sib-folder-wrap"></div>').append(header).append(content);
+}
+
+// Универсальный билдер папок для персонажей и локаций
+function buildFolderSectionForItems(folderName, items, type) {
+    const header = $(`<div class="sib-folder-header"><i class="fas fa-folder sib-folder-icon"></i><span style="flex:1;">${folderName}</span><span style="opacity:0.5;font-size:0.8em;">${items.length} шт.</span><i class="fas fa-chevron-right sib-folder-chevron"></i></div>`);
+    const content = $('<div class="sib-folder-content" style="display:none;"></div>');
+    
+    items.forEach(item => {
+        const desc = type === 'char' ? item.appearance : item.description;
+        const el = $(`<div class="sib-block-item">
+            <div class="sib-item-left"><div><div class="sib-item-name">${item.name}</div><div class="sib-item-profile">${desc || '—'}</div></div></div>
+            <div class="sib-item-right"><button class="sib-${type}-edit sib-btn-icon">✏️</button></div>
+        </div>`);
+        el.find(`.sib-${type}-edit`).on('click', () => type === 'char' ? openCharEditor(item.id) : openEnvEditor(item.id));
+        content.append(el);
+    });
+    
+    header.on('click', function () { 
+        const hidden = content.is(':hidden'); 
+        content.slideToggle(200); 
+        header.find('.sib-folder-icon').toggleClass('fa-folder', !hidden).toggleClass('fa-folder-open', hidden); 
+        header.find('.sib-folder-chevron').css('transform', hidden ? 'rotate(90deg)' : 'rotate(0deg)'); 
+    });
     return $('<div class="sib-folder-wrap"></div>').append(header).append(content);
 }
