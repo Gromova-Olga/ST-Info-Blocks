@@ -18,12 +18,19 @@ if (eventSource && event_types) {
 
 export async function runAllInfoBlocks(mesId, options = {}) {
     if (mesId === 0 || mesId === '0') return;
-    if (isStGenerating) {
+
+    // Достаем параметр force (по умолчанию false)
+    const { isSwipe = false, force = false } = options;
+
+    // Если Таверна генерирует И это не ручной вызов — отменяем
+    if (isStGenerating && !force) {
         console.log(`[${extensionName}] InfoBlocks: отмена — таверна генерирует.`);
         return;
     }
+    
+    // Если вызов ручной — принудительно сбрасываем зависший флаг для будущих свайпов
+    if (force) isStGenerating = false;
 
-    const { isSwipe = false } = options;
     const messageText = chat[mesId]?.mes || '';
     const cleanText = messageText.trim();
     if (!cleanText || cleanText === '...' || cleanText === '…') return;
@@ -67,7 +74,7 @@ async function runInfoGroup(group, mesId) {
     const virtualBlock = { ...group[0], prompt: combinedPrompt };
 
     try {
-        const html = await InfoBlockApiService.generate(virtualBlock);
+        const html = await InfoBlockApiService.generate(virtualBlock, mesId);
         group.forEach(b => clearInfoBlockLoading(mesId, b.id));
 
         const cleanHtml = html.replace(/^```html\s*/im, '').replace(/```\s*$/m, '').trim();

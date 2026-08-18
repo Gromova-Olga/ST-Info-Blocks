@@ -22,10 +22,23 @@ export const ImageBlockApiService = {
     /**
      * Собирает последние N сообщений из DOM (без служебных блоков)
      */
-    buildContextMessages(count = 10) {
+buildContextMessages(count = 10, targetMesId = null) {
         const messages = [];
-        const mesElements = document.querySelectorAll('.mes');
-        const sliced = Array.from(mesElements).slice(-Math.min(count, 30));
+        const mesElements = Array.from(document.querySelectorAll('.mes'));
+
+        let sliced = [];
+        
+        if (targetMesId !== null && targetMesId !== undefined) {
+            const targetIndex = mesElements.findIndex(el => el.getAttribute('mesid') == targetMesId);
+            if (targetIndex !== -1) {
+                const startIndex = Math.max(0, targetIndex - count + 1);
+                sliced = mesElements.slice(startIndex, targetIndex + 1);
+            } else {
+                sliced = mesElements.slice(-Math.min(count, 30));
+            }
+        } else {
+            sliced = mesElements.slice(-Math.min(count, 30));
+        }
 
         for (const mes of sliced) {
             const isUser = mes.getAttribute('is_user') === 'true';
@@ -34,7 +47,10 @@ export const ImageBlockApiService = {
 
             const clone = textEl.cloneNode(true);
             clone.querySelectorAll('details, .sib-wrapper, .sib-image-block-wrapper').forEach(el => el.remove());
-            const text = clone.textContent.trim();
+            
+            let text = clone.textContent.trim();
+            text = text.replace(/\[(NHUD|HUD_CORE|HUD_PROG|HUD_CUSTOM)\][\s\S]*?\[\/\1\]/gi, '').trim();
+
             if (text) {
                 messages.push({ role: isUser ? 'user' : 'assistant', content: text });
             }
@@ -57,12 +73,14 @@ export const ImageBlockApiService = {
      * @param {string} charactersStr — подготовленная строка персонажей
      * @returns {Promise<string>}
      */
-    async generate(block, charactersStr) {
+async generate(block, charactersStr, targetMesId) {
         const profile = this.getProfile(block.profile);
         if (!profile) throw new Error(`Профиль "${block.profile}" не найден`);
 
         const ccSource = this.getChatCompletionSource(profile.api);
-        const contextMessages = this.buildContextMessages(block.contextMessages ?? 6);
+        
+        // Передаем targetMesId
+        const contextMessages = this.buildContextMessages(block.contextMessages ?? 6, targetMesId);
 
         // 1. Берем инструкцию и подставляем персонажей, если там есть тег
         let instruction = (block.promptInstruction || '').replace(/\{\{characters\}\}/g, charactersStr);

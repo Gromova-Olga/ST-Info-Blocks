@@ -35,10 +35,28 @@ export const InfoBlockApiService = {
      * @param {number} count
      * @returns {Array<{role: string, content: string}>}
      */
-    buildContextMessages(count = 10) {
+    buildContextMessages(count = 10, targetMesId = null) {
         const messages = [];
-        const mesElements = document.querySelectorAll('.mes');
-        const sliced = Array.from(mesElements).slice(-Math.min(count, 30));
+        const mesElements = Array.from(document.querySelectorAll('.mes'));
+        
+        let sliced = [];
+        
+        // Если передан ID сообщения, ищем его в DOM
+        if (targetMesId !== null && targetMesId !== undefined) {
+            const targetIndex = mesElements.findIndex(el => el.getAttribute('mesid') == targetMesId);
+            
+            if (targetIndex !== -1) {
+                // Если нашли, берем сообщения ДО него включительно
+                const startIndex = Math.max(0, targetIndex - count + 1);
+                sliced = mesElements.slice(startIndex, targetIndex + 1);
+            } else {
+                // Фолбэк, если почему-то не нашли
+                sliced = mesElements.slice(-Math.min(count, 30));
+            }
+        } else {
+            // Стандартное поведение (для новых сообщений)
+            sliced = mesElements.slice(-Math.min(count, 30));
+        }
 
         for (const mes of sliced) {
             const isUser = mes.getAttribute('is_user') === 'true';
@@ -46,9 +64,11 @@ export const InfoBlockApiService = {
             if (!textEl) continue;
 
             const clone = textEl.cloneNode(true);
-            // Удаляем служебные блоки (details/summary) — там могут быть теги NHUD и инфоблоки
             clone.querySelectorAll('details, .sib-wrapper').forEach(el => el.remove());
-            const text = clone.textContent.trim();
+            
+            let text = clone.textContent.trim();
+            text = text.replace(/\[(NHUD|HUD_CORE|HUD_PROG|HUD_CUSTOM)\][\s\S]*?\[\/\1\]/gi, '').trim();
+
             if (text) {
                 messages.push({ role: isUser ? 'user' : 'assistant', content: text });
             }
@@ -79,12 +99,14 @@ export const InfoBlockApiService = {
      * @param {Object} block - объект блока из StateManager
      * @returns {Promise<string>} HTML от AI
      */
-async generate(block) {
+async generate(block, targetMesId) {
         const profile = this.getProfile(block.profile);
         if (!profile) throw new Error(`Профиль "${block.profile}" не найден`);
 
         const ccSource = this.getChatCompletionSource(profile.api);
-        const contextMessages = this.buildContextMessages(block.contextMessages ?? 10);
+        
+        // Передаем targetMesId в сборщик контекста
+        const contextMessages = this.buildContextMessages(block.contextMessages ?? 10, targetMesId);
 
         const messages = [
             { role: 'user', content: `[INSTRUCTION]\n${block.prompt}\n[/INSTRUCTION]` },
